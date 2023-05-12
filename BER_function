@@ -1,0 +1,69 @@
+% calculate the BER in a sitution of random
+% generated N bits that pass through sampling (8bits/sample) and modulated
+% into a cos wave with frequency of 2KHz, then transmitted through AWGN
+% channel with certain SNR, and recevied - demodulated - converted back to
+% N number of received bits (may with error), and this functioin will
+% calculate BER between transmitted bits and received
+% bits
+
+
+function BER = error_modem_binary (N,snr) % N as input which is number of random bits / snr = SNR for signal in AWGN channel
+%parameters : 
+fc = 2000; %carrier frequency  
+Fs = 8000; %sample / s
+error = 0; %error (number of errors in Tx and Rx_final decided value)
+
+%generate 1000 random bits 
+data = randi([0,1],1,N);
+
+%sample bit stream 8samples/bit
+for c1 = 1:length(data)
+    index = (c1 - 1)*8 + 1;
+    sample_data(index:index + 7) = data(c1);
+end
+
+%sampled wave 
+
+t = linspace(0,N*.001,length(sample_data));
+x = sample_data .* cos(2*pi*fc*t);
+
+%transmission stage - AWGN channel 
+%generated gaussian noise:
+y = awgn(x,snr,'measured');
+
+%demodulated signal
+y_dem = y .* cos(2*pi*fc*t);
+%filter the demodulated signal by using butterworth filter
+[b,a] = butter(5,fc/Fs);
+filltered_sig = filtfilt(b,a,y_dem);
+
+%recover the bits
+for c3 = 1:length(data)
+    index = (c3 - 1)*8 + 1;
+    y_decode(c3) = mean(filltered_sig(index:index + 7));
+end
+
+%for detecting the bits (1/0) from the recovered bits :
+
+%overall amplitude of original bits are 0.5 (average of 1 or 0 = 0.5 which is the original decisioin threshold)
+%due to filter, which attenuates by half of overall amplitude, therefore,
+%decision amplitude has been changed from 0.5 to 0.25
+
+%decided value (1/0) after applying decide threshold amplitude of 0.25 (>0.25 = 1 ; <0.25 = 0)
+for i = 1:length(data)
+    if y_decode(i) > 0.25
+        y_final(i) = 1;
+    else
+        y_final(i) = 0;
+    end
+end
+
+%find number of errors occur by comparing Tx and Rx_decided bits 
+for j = 1:length(data)
+    if y_final(j) ~= data(j)
+        error = error + 1;
+    end
+end
+BER = error/N;
+
+end
